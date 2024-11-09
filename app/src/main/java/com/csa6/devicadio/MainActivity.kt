@@ -8,6 +8,7 @@ import android.graphics.SurfaceTexture
 import android.os.Bundle
 import android.view.Surface
 import android.view.TextureView
+import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -17,14 +18,17 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import android.hardware.camera2.*
 import androidx.appcompat.app.AppCompatDelegate
+import android.graphics.Bitmap
 
 class MainActivity : AppCompatActivity() {
     private lateinit var cameraManager: CameraManager
     private lateinit var textureView: TextureView
     private lateinit var cameraDevice: CameraDevice
+    private lateinit var objectDetector: ObjectDetector
+    private lateinit var textView: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
@@ -36,6 +40,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         textureView = findViewById(R.id.cameraPreview)
+        textView = findViewById(R.id.objectDetected)
+        objectDetector = ObjectDetector(this)
+
         cameraManager = getSystemService(CameraManager::class.java)
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
@@ -69,7 +76,14 @@ class MainActivity : AppCompatActivity() {
 
             override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean = true
 
-            override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) {}
+            override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) {
+                // Capture image and detect objects once the surface is updated
+                val bitmap = textureView.bitmap
+                bitmap?.let {
+                    val detectedObjects = objectDetector.detectObjects(it)
+                    textView.text = detectedObjects
+                }
+            }
         }
     }
 
@@ -107,5 +121,10 @@ class MainActivity : AppCompatActivity() {
         } catch (e: CameraAccessException) {
             e.printStackTrace()
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        objectDetector.close()
     }
 }
