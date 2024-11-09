@@ -33,7 +33,7 @@ class ObjectDetector(context: Context) {
 
     fun detectObjects(bitmap: Bitmap): String {
         val inputBitmap = preprocessImage(bitmap)
-        val inputBuffer = inputBitmap.toByteBuffer() // Convert the bitmap to ByteBuffer
+        val inputBuffer = inputBitmap.toByteBuffer()
 
         // Output array: 1 batch, 1001 possible classes for MobileNet
         val outputArray = Array(1) { FloatArray(1001) }
@@ -41,16 +41,26 @@ class ObjectDetector(context: Context) {
         // Run inference
         interpreter.run(inputBuffer, outputArray)
 
-        // Get the class with the highest probability
-        val maxIndex = outputArray[0].indices.maxByOrNull { outputArray[0][it] } ?: -1
-        val objectName = if (maxIndex >= 0 && maxIndex < labelList.size) labelList[maxIndex] else "Unknown"
+        // Get objects with confidence greater than 70%
+        val detectedObjects = mutableListOf<String>()
+        outputArray[0].indices.sortedByDescending { outputArray[0][it] }
+            .forEach { index ->
+                val confidence = outputArray[0][index] * 100
+                if (confidence >= 70) {
+                    val objectName = if (index >= 0 && index < labelList.size) labelList[index] else "Unknown"
+                    detectedObjects.add("$objectName ($confidence%)")
+                }
+            }
 
-        return "Caption: $objectName"
+        return if (detectedObjects.isNotEmpty()) {
+            detectedObjects.joinToString("\n")
+        } else {
+            "No objects detected with sufficient confidence"
+        }
     }
 
     private fun loadLabelMap(context: Context): List<String> {
         val labelList = mutableListOf<String>()
-        // Open the mobilenet_v1_1.0_224.txt file from assets
         val inputStream = context.assets.open("mobilenet_v1_1.0_224.txt")
         inputStream.bufferedReader().useLines { lines ->
             lines.forEach {
@@ -59,7 +69,6 @@ class ObjectDetector(context: Context) {
         }
         return labelList
     }
-
 
     private fun Bitmap.toByteBuffer(): ByteBuffer {
         val byteBuffer = ByteBuffer.allocateDirect(4 * inputSize * inputSize * 3)
@@ -74,8 +83,8 @@ class ObjectDetector(context: Context) {
         return byteBuffer
     }
 
-
     fun close() {
         interpreter.close()
     }
 }
+
